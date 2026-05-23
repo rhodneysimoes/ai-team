@@ -30,3 +30,7 @@ Implementar codigo Go idiomatico, legivel e integrado ao projeto existente.
 - Prefira slices e maps inicializados de forma clara.
 - Mantenha goroutines com cancelamento, sincronizacao e canal de erro quando necessario.
 - Feche recursos com `defer` logo apos validacao do erro de abertura.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, explicações, justificativas e comentários gerados devem ser redigidos em **Português do Brasil (pt-br)**.

@@ -53,5 +53,9 @@ Para preparar build, CI ou entrega, use `workflows/go-release.md`.
 Para orientar decisoes de desenho e qualidade em Go, use `sdd/go-sdd.md`.
 
 Para tarefas com contexto espalhado no repositorio, use `rag/rag-playbook.md`.
-
+ 
 Para calibrar dificuldade, risco e profundidade de verificacao, use `hardness/hardness-matrix.md`.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompts, explicações, planos de execução, relatórios, commits e qualquer outra comunicação gerada pelos agentes devem ser obrigatoriamente escritas em **Português do Brasil (pt-br)**.

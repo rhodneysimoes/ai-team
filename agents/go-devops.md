@@ -28,3 +28,7 @@ Preparar projetos Go para build, validacao continua, empacotamento, release e op
 - `go test ./...`
 - `go build ./...`
 - `go vet ./...`
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, instruções de deploy/CI, relatórios e documentação de infraestrutura devem ser redigidos em **Português do Brasil (pt-br)**.

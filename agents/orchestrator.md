@@ -39,3 +39,7 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 - Decisoes tecnicas importantes registradas de forma breve.
 - `README.md` e `CHANGELOG.md` atualizados quando a mudanca exigir documentacao.
 - Entrega final descreve mudancas e verificacoes.
+
+## Idioma
+
+- **Obrigatoriedade:** Toda e qualquer saída de prompt, plano de execução, relatório ou explicação gerada por este agente ou por seus especialistas acionados deve ser redigida em **Português do Brasil (pt-br)**.

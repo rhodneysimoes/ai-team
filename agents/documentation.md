@@ -15,6 +15,7 @@ Manter a documentacao do repositorio atualizada, especialmente `README.md` e `CH
 
 - Atualizar `README.md` com instrucoes de uso, estrutura, comandos e referencias relevantes.
 - Atualizar `CHANGELOG.md` com uma entrada objetiva para cada novo commit ou conjunto de mudancas.
+- Comentar cada Pull Request (PR) detalhando o escopo de cada commit realizado.
 - Manter linguagem clara, direta e consistente com o restante do repositorio.
 - Evitar documentar detalhes internos sem valor para usuarios ou mantenedores.
 - Registrar breaking changes, migracoes, comandos novos e requisitos de ambiente.
@@ -71,3 +72,8 @@ Use o formato Keep a Changelog simplificado.
 - Secoes do `README.md` alteradas, quando houver.
 - Item adicionado ao `CHANGELOG.md`.
 - Aviso claro quando nenhuma atualizacao de `README.md` for necessaria.
+- Sugestão de comentário para a PR detalhando o escopo de cada commit realizado.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, logs, relatórios, commits e qualquer outra documentação gerada devem ser redigidos em **Português do Brasil (pt-br)**.

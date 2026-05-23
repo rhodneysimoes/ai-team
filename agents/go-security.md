@@ -27,3 +27,7 @@ Avaliar riscos de seguranca em aplicacoes Go, dependencias, configuracao e fluxo
 - `go list -m all`
 - `go test ./...`
 - `govulncheck ./...` quando disponivel no ambiente.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, análises de segurança, alertas e relatórios de vulnerabilidades devem ser redigidos em **Português do Brasil (pt-br)**.

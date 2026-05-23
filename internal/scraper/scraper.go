@@ -2,6 +2,7 @@ package scraper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html"
 	"io"
@@ -152,6 +153,11 @@ func ExtractPromotions(definition sites.Definition, html string, matchedAt time.
 		return nil, fmt.Errorf("compile pattern for %q: %w", definition.Name, err)
 	}
 
+	// Try to extract from Next.js hydration payload if it exists
+	if jsonPromos, ok := tryExtractNextData(definition, html, expression, definition.URL, matchedAt); ok {
+		return jsonPromos, nil
+	}
+
 	text := normalizeText(stripTags(html))
 	matches := expression.FindAllString(text, -1)
 	promotions := make([]Promotion, 0, len(matches))
@@ -231,6 +237,13 @@ func detectBlockedResponse(response *http.Response, body string) (bool, string) 
 }
 
 func stripTags(input string) string {
+	// Remove script blocks and style blocks including their contents
+	scriptRegex := regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	input = scriptRegex.ReplaceAllString(input, " ")
+
+	styleRegex := regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	input = styleRegex.ReplaceAllString(input, " ")
+
 	replacer := strings.NewReplacer(
 		"<br>", " ",
 		"<br/>", " ",
@@ -253,33 +266,52 @@ func normalizeText(input string) string {
 }
 
 func extractThumbnailURL(input, pageURL string) string {
-	for _, tag := range thumbnailCandidateTags(input) {
-		for _, attribute := range []string{"src", "data-src", "data-lazy-src", "content"} {
-			value := extractAttribute(tag, attribute)
-			if value == "" {
-				continue
+	tags := regexp.MustCompile(`(?is)<[^>]+>`).FindAllString(input, -1)
+
+	var ogImages []string
+	var twitterImages []string
+	var tagDescontos []string
+	var fallbackThumbnails []string
+
+	for _, tag := range tags {
+		lower := strings.ToLower(tag)
+		// Exclude cookie consent and other unwanted tags from thumbnail processing
+		if strings.Contains(lower, "cookielaw") || strings.Contains(lower, "onetrust") || strings.Contains(lower, "ot-sdk") || strings.Contains(lower, "cookie-") {
+			continue
+		}
+
+		if strings.Contains(lower, `property="og:image"`) || strings.Contains(lower, `property='og:image'`) {
+			ogImages = append(ogImages, tag)
+		} else if strings.Contains(lower, `name="twitter:image"`) || strings.Contains(lower, `name='twitter:image'`) {
+			twitterImages = append(twitterImages, tag)
+		} else if strings.Contains(lower, "tag descontos") {
+			tagDescontos = append(tagDescontos, tag)
+		} else if strings.Contains(lower, "thumbnail") {
+			fallbackThumbnails = append(fallbackThumbnails, tag)
+		}
+	}
+
+	priorityGroups := [][]string{ogImages, twitterImages, tagDescontos, fallbackThumbnails}
+	for _, group := range priorityGroups {
+		for _, tag := range group {
+			for _, attribute := range []string{"content", "src", "data-src", "data-lazy-src"} {
+				value := extractAttribute(tag, attribute)
+				if value == "" {
+					continue
+				}
+				resolved := resolveURL(pageURL, html.UnescapeString(value))
+				if resolved == "" {
+					continue
+				}
+				lowerResolved := strings.ToLower(resolved)
+				if strings.Contains(lowerResolved, "cookielaw") || strings.Contains(lowerResolved, "onetrust") || strings.Contains(lowerResolved, "cookie") {
+					continue
+				}
+				return resolved
 			}
-			return resolveURL(pageURL, html.UnescapeString(value))
 		}
 	}
 	return ""
-}
-
-func thumbnailCandidateTags(input string) []string {
-	tags := regexp.MustCompile(`(?is)<[^>]+>`).FindAllString(input, -1)
-	candidates := make([]string, 0, len(tags))
-	for _, tag := range tags {
-		lower := strings.ToLower(tag)
-		if strings.Contains(lower, "thumbnail") ||
-			strings.Contains(lower, "tag descontos") ||
-			strings.Contains(lower, `property="og:image"`) ||
-			strings.Contains(lower, `property='og:image'`) ||
-			strings.Contains(lower, `name="twitter:image"`) ||
-			strings.Contains(lower, `name='twitter:image'`) {
-			candidates = append(candidates, tag)
-		}
-	}
-	return candidates
 }
 
 func extractAttribute(tag, name string) string {
@@ -315,4 +347,130 @@ func resolveURL(baseURL, value string) string {
 		return trimmed
 	}
 	return base.ResolveReference(parsed).String()
+}
+
+type nextDataPayload struct {
+	Props struct {
+		PageProps struct {
+			Banners map[string]json.RawMessage `json:"banners"`
+			Offers  struct {
+				Products []struct {
+					Name               string  `json:"name"`
+					Thumbnail          string  `json:"thumbnail"`
+					Link               string  `json:"link"`
+					DiscountPercentage float64 `json:"discountPercentage"`
+					Price              float64 `json:"price"`
+					PriceWithDiscount  float64 `json:"priceWithDiscount"`
+					Stamp              *struct {
+						Title string `json:"title"`
+						Type  string `json:"type"`
+					} `json:"stamp"`
+				} `json:"products"`
+			} `json:"offers"`
+		} `json:"pageProps"`
+	} `json:"props"`
+}
+
+func tryExtractNextData(definition sites.Definition, htmlContent string, expression *regexp.Regexp, pageURL string, matchedAt time.Time) ([]Promotion, bool) {
+	re := regexp.MustCompile(`(?s)<script id="__NEXT_DATA__"[^>]*>(.*?)</script>`)
+	match := re.FindStringSubmatch(htmlContent)
+	if len(match) < 2 {
+		return nil, false
+	}
+
+	var data nextDataPayload
+	if err := json.Unmarshal([]byte(match[1]), &data); err != nil {
+		return nil, false
+	}
+
+	promotions := []Promotion{}
+	seen := map[string]struct{}{}
+
+	// Extract from Banners
+	for key, rawList := range data.Props.PageProps.Banners {
+		var list []struct {
+			Title        string `json:"title"`
+			Banner       string `json:"banner"`
+			BannerMobile string `json:"bannerMobile"`
+			Link         string `json:"link"`
+			SubTitle     string `json:"subTitle"`
+		}
+		if err := json.Unmarshal(rawList, &list); err != nil {
+			continue
+		}
+
+		for _, item := range list {
+			matchText := item.Title
+			if item.SubTitle != "" {
+				matchText = fmt.Sprintf("%s - %s", item.Title, item.SubTitle)
+			}
+			matchText = fmt.Sprintf("Banner %s: %s", key, matchText)
+
+			if expression.MatchString(matchText) || expression.MatchString(item.Link) {
+				bannerURL := item.Banner
+				if bannerURL == "" {
+					bannerURL = item.BannerMobile
+				}
+				resolvedLink := resolveURL(pageURL, item.Link)
+				text := item.Title
+				if item.SubTitle != "" {
+					text = fmt.Sprintf("%s - %s", item.Title, item.SubTitle)
+				}
+				text = normalizeText(text)
+				if text == "" {
+					text = fmt.Sprintf("Banner %s: %s", key, item.Title)
+				}
+				if _, ok := seen[text]; ok {
+					continue
+				}
+				seen[text] = struct{}{}
+
+				promotions = append(promotions, Promotion{
+					Site:         definition.Name,
+					URL:          resolvedLink,
+					Text:         text,
+					ThumbnailURL: resolveURL(pageURL, bannerURL),
+					MatchedAt:    matchedAt,
+				})
+			}
+		}
+	}
+
+	// Extract from Products/Offers
+	for _, prod := range data.Props.PageProps.Offers.Products {
+		stampTitle := ""
+		if prod.Stamp != nil {
+			stampTitle = prod.Stamp.Title
+		}
+
+		text := prod.Name
+		if stampTitle != "" {
+			text += fmt.Sprintf(" (Cupom: %s)", stampTitle)
+		}
+		if prod.DiscountPercentage > 0 {
+			text += fmt.Sprintf(" - %.0f%% OFF", prod.DiscountPercentage)
+		}
+		if prod.PriceWithDiscount > 0 {
+			text += fmt.Sprintf(" - De: R$ %.2f Por: R$ %.2f", prod.Price, prod.PriceWithDiscount)
+		} else if prod.Price > 0 {
+			text += fmt.Sprintf(" - R$ %.2f", prod.Price)
+		}
+
+		if expression.MatchString(text) || expression.MatchString(prod.Link) || (prod.Stamp != nil && expression.MatchString(prod.Stamp.Title)) {
+			if _, ok := seen[text]; ok {
+				continue
+			}
+			seen[text] = struct{}{}
+
+			promotions = append(promotions, Promotion{
+				Site:         definition.Name,
+				URL:          resolveURL(pageURL, prod.Link),
+				Text:         normalizeText(text),
+				ThumbnailURL: resolveURL(pageURL, prod.Thumbnail),
+				MatchedAt:    matchedAt,
+			})
+		}
+	}
+
+	return promotions, len(promotions) > 0
 }
