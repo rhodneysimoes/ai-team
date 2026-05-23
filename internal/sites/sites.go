@@ -77,8 +77,11 @@ func parseDefinition(columns []string) (Definition, error) {
 		return Definition{}, fmt.Errorf("site %q url is required", definition.Name)
 	}
 	parsed, err := url.ParseRequestURI(definition.URL)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return Definition{}, fmt.Errorf("site %q has invalid url %q", definition.Name, definition.URL)
+	if err != nil {
+		return Definition{}, fmt.Errorf("site %q has invalid url %q: %w", definition.Name, definition.URL, err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return Definition{}, fmt.Errorf("site %q has invalid url %q: missing scheme or host", definition.Name, definition.URL)
 	}
 
 	return definition, nil
