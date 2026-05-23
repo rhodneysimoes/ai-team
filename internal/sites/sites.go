@@ -16,6 +16,8 @@ type Definition struct {
 	Headers map[string]string `json:"headers,omitempty"`
 }
 
+// LoadMarkdown lê o arquivo markdown contendo a tabela de especificações dos e-commerces,
+// extrai as linhas da tabela e as converte em definições de site utilizáveis pelo scraper.
 func LoadMarkdown(path string) ([]Definition, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -58,6 +60,8 @@ func LoadMarkdown(path string) ([]Definition, error) {
 	return definitions, nil
 }
 
+// parseDefinition converte as colunas extraídas de uma linha da tabela markdown
+// em uma struct Definition de site, validando a obrigatoriedade do nome e a URL informada.
 func parseDefinition(columns []string) (Definition, error) {
 	definition := Definition{
 		Name:    strings.TrimSpace(columns[0]),

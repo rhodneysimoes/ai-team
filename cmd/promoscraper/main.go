@@ -14,6 +14,7 @@ import (
 	"github.com/rhodneysimoes/ai-team/internal/sites"
 )
 
+// main é o ponto de entrada do utilitário promoscraper.
 func main() {
 	var (
 		sitesPath   = flag.String("sites", "sites.md", "path to markdown sites file")
@@ -28,6 +29,8 @@ func main() {
 	}
 }
 
+// run executa o fluxo principal do scraper: carrega as definições dos sites, inicia a coleta com o tempo limite e
+// a concorrência definidos, filtra promoções sem preço válido e grava os resultados em JSON formatado.
 func run(sitesPath, outputPath string, timeout time.Duration, concurrency int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
