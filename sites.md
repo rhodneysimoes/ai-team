@@ -23,7 +23,7 @@ Regras:
 
 | name | url | pattern | enabled | headers |
 | --- | --- | --- | --- | --- |
-| Example | https://example.com | (?i)(promo\|oferta\|desconto\|sale).{0,120} | false | |
 | Kabum | https://www.kabum.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | false | |
 | Pichau | https://www.pichau.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | true | |
-| Terabyte Shop | https://www.terabyteshop.com.br | (?i)([0-9]{1,2}%\s*OFF\|Tera Maio\|Termina em:\|Frete gr.tis\|Mais vendido\|De:\s*R\$.*por:) | false | Accept-Language=pt-BR,pt\;q=0.9 |
+| Terabyte Shop | https://www.terabyteshop.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | true | Accept-Language=pt-BR,pt\;q=0.9 |
+
