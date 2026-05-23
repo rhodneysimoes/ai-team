@@ -416,4 +416,41 @@ func TestIsProductURL(t *testing.T) {
 	}
 }
 
+func TestCollectDeduplicatesByURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/" {
+			_, _ = w.Write([]byte(`<html><body>
+				<a href="/produto/item1">Item 1 First Link</a>
+				<a href="/produto/item1">Item 1 Second Link</a>
+			</body></html>`))
+		} else if request.URL.Path == "/produto/item1" {
+			_, _ = w.Write([]byte(`<html><body><p>Oferta do item 1 com frete gratis</p></body></html>`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	results, err := Collect(context.Background(), server.Client(), []sites.Definition{
+		{
+			Name:    "Store C",
+			URL:     server.URL,
+			Pattern: `(?i)oferta.{0,40}`,
+			Enabled: true,
+		},
+	}, Options{Concurrency: 1})
+
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	// Mesmo que o link apareça duas vezes, esperamos exatamente 1 promoção no resultado.
+	if len(results[0].Promotions) != 1 {
+		t.Fatalf("len(results[0].Promotions) = %d, want 1 (deduplicated by URL), got %d", len(results[0].Promotions), len(results[0].Promotions))
+	}
+}
+
+
 

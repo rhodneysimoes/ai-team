@@ -131,10 +131,10 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 		return result
 	}
 
-	// Deduplicate promotions using a map of their text
+	// Deduplicate promotions using a map of their URL
 	seen := make(map[string]struct{})
 	for _, p := range promotions {
-		seen[p.Text] = struct{}{}
+		seen[p.URL] = struct{}{}
 	}
 
 	// Worker pool to fetch level 2 URLs concurrently
@@ -187,19 +187,23 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 	for res := range resultsChan {
 		if res.err == nil && len(res.promos) > 0 {
 			for _, p := range res.promos {
-				if _, ok := seen[p.Text]; !ok {
-					seen[p.Text] = struct{}{}
+				if _, ok := seen[p.URL]; !ok {
+					seen[p.URL] = struct{}{}
 					result.Promotions = append(result.Promotions, p)
 				}
 			}
 		}
 	}
 
-	// Filter promotions to only keep those that are single product pages
+	// Filter promotions to only keep those that are single product pages and deduplicate by URL
 	var filteredPromos []Promotion
+	seenURL := make(map[string]struct{})
 	for _, p := range result.Promotions {
 		if isProductURL(p.URL) {
-			filteredPromos = append(filteredPromos, p)
+			if _, ok := seenURL[p.URL]; !ok {
+				seenURL[p.URL] = struct{}{}
+				filteredPromos = append(filteredPromos, p)
+			}
 		}
 	}
 	result.Promotions = filteredPromos
