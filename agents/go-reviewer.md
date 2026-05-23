@@ -29,6 +29,7 @@ Revisar alteracoes Go com foco em bugs, regressao, comportamento, testes e manut
 - Goroutines tem caminho de encerramento.
 - APIs publicas continuam compativeis ou tem migracao clara.
 - Testes cobrem comportamento novo e falhas relevantes.
+- Todas as principais funcoes e metodos novos ou modificados possuem comentarios explicativos em Portugues do Brasil (pt-br).
 
 ## Idioma
 

@@ -19,7 +19,7 @@ Implementar codigo Go idiomatico, legivel e integrado ao projeto existente.
 - O codigo compila.
 - `gofmt` foi aplicado.
 - Erros recebem contexto util sem esconder a causa original.
-- Funcoes publicas tem comentario quando o pacote exigir ou quando a API precisar.
+- Funcoes e metodos publicos e principais possuem comentarios explicativos obrigatoriamente em Portugues do Brasil (pt-br).
 - Caminhos felizes e erros importantes estao cobertos por testes.
 - Nenhum secret, caminho local ou configuracao sensivel foi fixado no codigo.
 

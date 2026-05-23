@@ -42,6 +42,7 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 - Decisoes tecnicas importantes registradas de forma breve.
 - `README.md` e `CHANGELOG.md` atualizados quando a mudanca exigir documentacao.
 - Entrega final descreve mudancas e verificacoes.
+- Principais funcoes e metodos do projeto devidamente documentados com comentarios explicativos em Portugues do Brasil (pt-br).
 
 ## Idioma
 

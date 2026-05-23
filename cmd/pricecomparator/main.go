@@ -13,6 +13,7 @@ import (
 	"github.com/rhodneysimoes/ai-team/internal/scraper"
 )
 
+// main é o ponto de entrada do utilitário de comparação de preços.
 func main() {
 	var (
 		inputPath  = flag.String("input", "promotions.json", "path to input promotions JSON file")
@@ -26,6 +27,8 @@ func main() {
 	}
 }
 
+// run executa o comparador de preços, lendo as promoções do arquivo de entrada, agrupando-as por produto normalizado
+// e salvando os resultados de menor e maior preço nos respectivos arquivos de saída.
 func run(inputPath, minOutPath, maxOutPath string) error {
 	data, err := os.ReadFile(inputPath)
 	if err != nil {
@@ -107,6 +110,8 @@ func run(inputPath, minOutPath, maxOutPath string) error {
 	return nil
 }
 
+// CleanProductText remove prefixos e sufixos de marketing específicos das lojas (Pichau, Terabyte, Kabum)
+// e informações redundantes de preço/desconto do texto do produto.
 func CleanProductText(text string) string {
 	text = strings.TrimSpace(text)
 
@@ -146,6 +151,8 @@ func CleanProductText(text string) string {
 	return text
 }
 
+// GenerateMatchKey gera uma chave de correspondência a partir do texto do produto, limpando ruídos,
+// convertendo para minúsculas, removendo caracteres especiais e ordenando as palavras alfabeticamente.
 func GenerateMatchKey(text string) string {
 	cleaned := CleanProductText(text)
 	cleaned = strings.ToLower(cleaned)

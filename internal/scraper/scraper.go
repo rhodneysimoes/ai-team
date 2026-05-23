@@ -43,6 +43,7 @@ type SiteResult struct {
 	Error       string      `json:"error,omitempty"`
 }
 
+// Collect inicia a coleta concorrente de ofertas de todos os sites habilitados utilizando as definições de busca.
 func Collect(ctx context.Context, client *http.Client, definitions []sites.Definition, options Options) ([]SiteResult, error) {
 	if client == nil {
 		return nil, fmt.Errorf("http client is required")
@@ -102,6 +103,8 @@ func Collect(ctx context.Context, client *http.Client, definitions []sites.Defin
 	return collected, nil
 }
 
+// collectSite coleta as promoções de um site específico de forma recursiva (Nível 1 e subpáginas de Nível 2),
+// deduplicando os resultados e controlando a concorrência dos fetches paralelos.
 func collectSite(ctx context.Context, client *http.Client, definition sites.Definition) SiteResult {
 	result := SiteResult{
 		Site: definition.Name,
@@ -195,6 +198,8 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 	return result
 }
 
+// fetchAndExtract realiza a requisição HTTP comum ou utiliza o fallback via navegador (chromedp)
+// para ler o HTML e extrair as promoções de uma URL.
 func fetchAndExtract(ctx context.Context, client *http.Client, definition sites.Definition, targetURL string) (string, []Promotion, int, bool, string, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
@@ -264,6 +269,8 @@ func isStaticFile(path string) bool {
 	return false
 }
 
+// extractLinks busca links internos válidos e normalizados na página inicial (Nível 1)
+// para navegação recursiva de Nível 2.
 func extractLinks(htmlContent, baseURL string) []string {
 	var links []string
 	re := regexp.MustCompile(`(?i)<a\s+[^>]*href=["']([^"']+)["']`)
@@ -319,6 +326,8 @@ func extractLinks(htmlContent, baseURL string) []string {
 	return links
 }
 
+// ExtractPromotions analisa o HTML de uma página (seja do payload Next.js ou via regex de correspondência no texto visível)
+// para extrair uma lista de estruturas do tipo Promotion com os dados do site, URL e preço.
 func ExtractPromotions(definition sites.Definition, html string, matchedAt time.Time) ([]Promotion, error) {
 	pattern := strings.TrimSpace(definition.Pattern)
 	if pattern == "" {
@@ -709,6 +718,8 @@ func parsePrice(s string) float64 {
 	return val
 }
 
+// extractPricesFromText analisa a string de promoção usando expressões regulares para tentar identificar
+// o preço atual de venda (por) e, opcionalmente, o preço original anterior (de).
 func extractPricesFromText(text string) (price float64, originalPrice float64) {
 	// Try to find "de: ... por: ..." patterns (with optional colons, optional spaces, optional R$)
 	dePorRegex := regexp.MustCompile(`(?i)\bde:?\s*(?:r\$\s*)?([0-9]+(?:[.,][0-9]+)*)\s+por:?\s*(?:r\$\s*)?([0-9]+(?:[.,][0-9]+)*)`)
@@ -730,6 +741,8 @@ func extractPricesFromText(text string) (price float64, originalPrice float64) {
 	return 0, 0
 }
 
+// fetchWithBrowser obtém o HTML renderizado de uma página web utilizando um navegador headless (chromedp),
+// atuando como fallback para evasão de bloqueios como os do Cloudflare.
 func fetchWithBrowser(ctx context.Context, urlStr string) (string, error) {
 	// Create context with a timeout so it doesn't hang forever
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
