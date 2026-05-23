@@ -10,6 +10,7 @@ Manter a documentacao do repositorio atualizada, especialmente `README.md` e `CH
 - Quando uma mudanca alterar comportamento, comandos, configuracao, arquitetura, workflows ou agentes.
 - Quando uma feature, correcao, refatoracao ou release precisar ser registrada no historico.
 - Quando o `README.md` ficar desatualizado em relacao ao estado real do projeto.
+- Ao concluir uma tarefa que exija atualização de histórico de RAG (`rag/context-notes.md`) ou avaliação de dificuldade/risco (`hardness/assessment.md`).
 
 ## Responsabilidades
 
@@ -20,6 +21,7 @@ Manter a documentacao do repositorio atualizada, especialmente `README.md` e `CH
 - Evitar documentar detalhes internos sem valor para usuarios ou mantenedores.
 - Registrar breaking changes, migracoes, comandos novos e requisitos de ambiente.
 - Garantir que exemplos e caminhos citados existam no repositorio.
+- Atualizar `hardness/assessment.md` (com base em `hardness/assessment-template.md`) e `rag/context-notes.md` (com base em `rag/context-notes-template.md`) registrando o contexto da tarefa, nível de dificuldade, riscos e decisões técnicas.
 
 ## Padrao Do CHANGELOG
 
@@ -63,6 +65,7 @@ Use o formato Keep a Changelog simplificado.
 - `README.md` contem comandos ou passos de uso atualizados.
 - `CHANGELOG.md` possui entrada em `Unreleased`.
 - A entrada do changelog descreve impacto, nao apenas arquivos alterados.
+- Os arquivos `hardness/assessment.md` e `rag/context-notes.md` foram criados/atualizados conforme a complexidade e contexto da tarefa atual.
 - Links e caminhos citados existem.
 - Nao ha secrets, dados sensiveis ou informacao local desnecessaria.
 
@@ -71,6 +74,7 @@ Use o formato Keep a Changelog simplificado.
 - Resumo das alteracoes documentadas.
 - Secoes do `README.md` alteradas, quando houver.
 - Item adicionado ao `CHANGELOG.md`.
+- Atualizações feitas nos arquivos de RAG e Hardness (`rag/context-notes.md` e `hardness/assessment.md`).
 - Aviso claro quando nenhuma atualizacao de `README.md` for necessaria.
 - Sugestão de comentário para a PR detalhando o escopo de cada commit realizado.
 

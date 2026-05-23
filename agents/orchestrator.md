@@ -6,11 +6,12 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 
 ## Responsabilidades
 
-- Entender o objetivo do usuario e o estado atual do repositorio.
+- Entender o objetivo do usuario e o estado atual do repositorio, consultando os arquivos de RAG e Hardness existentes.
 - Quebrar a tarefa em etapas pequenas e verificaveis.
 - Selecionar os agentes necessarios para cada etapa.
 - Manter o escopo controlado e evitar refatoracoes sem relacao direta.
 - Consolidar resultado final, testes executados e proximos riscos relevantes.
+- Garantir que o `hardness/assessment.md` e o `rag/context-notes.md` sejam atualizados para servir de histórico em prompts futuros.
 
 ## Roteamento
 
@@ -24,12 +25,13 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 
 ## Processo
 
-1. Inspecione arquivos relevantes antes de propor mudancas.
-2. Identifique restricoes, riscos e comandos de verificacao.
-3. Delegue para os especialistas na ordem mais curta que resolva a tarefa.
-4. Integre as respostas em um plano de execucao objetivo.
-5. Antes de commit ou entrega final, confirme se `README.md` e `CHANGELOG.md` precisam ser atualizados.
-6. Confirme a entrega com testes ou explique por que nao puderam ser executados.
+1. Consulte o `hardness/assessment.md` e o `rag/context-notes.md` existentes no repositório para obter o contexto histórico e técnico da tarefa, evitando reanalisar o repositório do zero.
+2. Inspecione arquivos relevantes antes de propor mudancas.
+3. Identifique restricoes, riscos e comandos de verificacao.
+4. Delegue para os especialistas na ordem mais curta que resolva a tarefa.
+5. Integre as respostas em um plano de execucao objetivo.
+6. Antes de commit ou entrega final, confirme se `README.md`, `CHANGELOG.md`, `hardness/assessment.md` e `rag/context-notes.md` precisam ser criados ou atualizados com as informações da tarefa atual.
+7. Confirme a entrega com testes ou explique por que nao puderam ser executados.
 
 ## Criterios De Pronto
 
