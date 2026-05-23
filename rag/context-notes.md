@@ -2,7 +2,7 @@
 
 ## Pergunta
 
-Como contornar bloqueios do Cloudflare de forma robusta, obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go, e evitar registros sem preço (incompletos) no arquivo promotions.json?
+Como contornar bloqueios do Cloudflare de forma robusta, obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go, evitar registros sem preço (incompletos) no arquivo promotions.json, e estender a coleta recursiva para todas as subpáginas internas (Nível 2)?
 
 ## Fontes Consultadas
 
@@ -20,6 +20,8 @@ Como contornar bloqueios do Cloudflare de forma robusta, obter informações de 
 - **Idioma dos PRs:** A imposição expressa nos prompts dos agentes garante que as contribuições e revisões de código de toda a equipe de agentes gerem PRs com títulos e descrições uniformemente localizados em Português do Brasil (pt-br).
 - **Ativação da Kabum:** O site da Kabum foi reabilitado no fluxo de scraping através da modificação da coluna `enabled` em `sites.md`.
 - **Filtro de Preço no Output:** A inserção de promoções sem preço (Price <= 0) no JSON de saída causa inconsistências na base de dados. Um filtro adicionado no CLI principal (`cmd/promoscraper/main.go`) remove os itens que não tiveram preço detectado ou que possuem valor inválido.
+- **Scraping de Nível 1 e 2:** A coleta recursiva aumenta significativamente a quantidade de promoções encontradas. As subpáginas internas são identificadas pelas tags `<a href="...">` no HTML da página inicial (Nível 1), filtrando-se arquivos estáticos e apenas URLs com o mesmo host/domínio do site de origem (links internos).
+- **Concurrency Worker Pool:** O fetch simultâneo das subpáginas do Nível 2 é executado de forma concorrente em cada site por meio de um pool com limite de 5 workers para otimizar velocidade e gerenciar o tempo limite geral de forma limpa.
 
 ## Decisao Influenciada
 
@@ -28,6 +30,7 @@ Como contornar bloqueios do Cloudflare de forma robusta, obter informações de 
 - Padronização de requisitos idiomáticos no Orchestrator e na Documentation abrangendo títulos e descrições de PRs.
 - Habilitação da coleta concorrente de todos os três grandes e-commerces (Kabum, Pichau e Terabyte Shop) simultaneamente no fluxo principal.
 - Implementação da filtragem de preços na camada de persistência em arquivo do CLI, mantendo o parseador resiliente para testes unitários com mocks sem preço, mas preservando apenas itens precificados válidos na saída final.
+- Refatoração de `collectSite` separando a lógica básica de fetch em `fetchAndExtract`. Implementação de extrator de links, pool de concorrência com WaitGroup e deduplicação unificada de ofertas encontradas nas fases de Nível 1 e Nível 2.
 
 ## Confianca
 

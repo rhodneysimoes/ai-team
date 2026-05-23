@@ -108,76 +108,210 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 		URL:  definition.URL,
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, definition.URL, nil)
+	htmlContent, promotions, statusCode, blocked, blockReason, err := fetchAndExtract(ctx, client, definition, definition.URL)
+	result.StatusCode = statusCode
+	result.Blocked = blocked
+	result.BlockReason = blockReason
 	if err != nil {
 		result.Error = err.Error()
+	}
+	result.Promotions = promotions
+
+	// If level 1 request was blocked or had an error, we do not proceed to level 2
+	if blocked || err != nil {
 		return result
+	}
+
+	// Extract links from level 1 HTML
+	level2URLs := extractLinks(htmlContent, definition.URL)
+	if len(level2URLs) == 0 {
+		return result
+	}
+
+	// Deduplicate promotions using a map of their text
+	seen := make(map[string]struct{})
+	for _, p := range promotions {
+		seen[p.Text] = struct{}{}
+	}
+
+	// Worker pool to fetch level 2 URLs concurrently
+	type job struct {
+		url string
+	}
+	type taskResult struct {
+		promos []Promotion
+		err    error
+	}
+
+	numWorkers := 5
+	if len(level2URLs) < numWorkers {
+		numWorkers = len(level2URLs)
+	}
+
+	jobsChan := make(chan job, len(level2URLs))
+	resultsChan := make(chan taskResult, len(level2URLs))
+
+	var wg sync.WaitGroup
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobsChan {
+				// Create copy of definition with the level 2 URL
+				defCopy := definition
+				defCopy.URL = j.url
+
+				_, pPromos, _, _, _, pErr := fetchAndExtract(ctx, client, defCopy, j.url)
+				resultsChan <- taskResult{promos: pPromos, err: pErr}
+			}
+		}()
+	}
+
+	for _, u := range level2URLs {
+		jobsChan <- job{url: u}
+	}
+	close(jobsChan)
+
+	wg.Wait()
+	close(resultsChan)
+
+	// Collect promotions from level 2
+	for res := range resultsChan {
+		if res.err == nil && len(res.promos) > 0 {
+			for _, p := range res.promos {
+				if _, ok := seen[p.Text]; !ok {
+					seen[p.Text] = struct{}{}
+					result.Promotions = append(result.Promotions, p)
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+func fetchAndExtract(ctx context.Context, client *http.Client, definition sites.Definition, targetURL string) (string, []Promotion, int, bool, string, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	if err != nil {
+		return "", nil, 0, false, "", err
 	}
 	applyRequestHeaders(request, definition)
 
 	response, err := client.Do(request)
 	if err != nil {
 		// Try browser fallback on connection failure
-		htmlContent, browserErr := fetchWithBrowser(ctx, definition.URL)
-		if browserErr == nil {
-			stillBlocked, _ := detectBlockedResponse(nil, htmlContent)
-			if !stillBlocked {
-				promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
-				if extractErr == nil {
-					result.StatusCode = http.StatusOK
-					result.Promotions = promotions
-					return result
-				}
-			}
+		htmlContent, browserErr := fetchWithBrowser(ctx, targetURL)
+		if browserErr != nil {
+			return "", nil, 0, false, "", err
 		}
-		result.Error = err.Error()
-		return result
+		stillBlocked, stillBlockedReason := detectBlockedResponse(nil, htmlContent)
+		if stillBlocked {
+			return htmlContent, nil, http.StatusForbidden, true, stillBlockedReason, fmt.Errorf("browser fallback also blocked: %s", stillBlockedReason)
+		}
+		promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
+		if extractErr != nil {
+			return htmlContent, nil, http.StatusOK, false, "", extractErr
+		}
+		return htmlContent, promotions, http.StatusOK, false, "", nil
 	}
 	defer response.Body.Close()
-	result.StatusCode = response.StatusCode
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
 		blocked, blockReason := detectBlockedResponse(response, string(body))
-		result.Blocked = blocked
-		result.BlockReason = blockReason
-		result.Error = fmt.Sprintf("unexpected status %s", response.Status)
-
 		if blocked {
-			htmlContent, browserErr := fetchWithBrowser(ctx, definition.URL)
+			htmlContent, browserErr := fetchWithBrowser(ctx, targetURL)
 			if browserErr == nil {
 				stillBlocked, stillBlockedReason := detectBlockedResponse(nil, htmlContent)
 				if !stillBlocked {
 					promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
 					if extractErr == nil {
-						result.Blocked = false
-						result.BlockReason = ""
-						result.Error = ""
-						result.StatusCode = http.StatusOK
-						result.Promotions = promotions
-						return result
+						return htmlContent, promotions, http.StatusOK, false, "", nil
 					}
-				} else {
-					result.BlockReason = "browser fallback also blocked: " + stillBlockedReason
+					return htmlContent, nil, http.StatusOK, false, "", extractErr
 				}
+				return htmlContent, nil, response.StatusCode, true, "browser fallback also blocked: " + stillBlockedReason, fmt.Errorf("unexpected status %s", response.Status)
 			}
 		}
-		return result
+		return string(body), nil, response.StatusCode, blocked, blockReason, fmt.Errorf("unexpected status %s", response.Status)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 	if err != nil {
-		result.Error = err.Error()
-		return result
+		return "", nil, response.StatusCode, false, "", err
 	}
 
-	promotions, err := ExtractPromotions(definition, string(body), time.Now().UTC())
+	promos, err := ExtractPromotions(definition, string(body), time.Now().UTC())
 	if err != nil {
-		result.Error = err.Error()
-		return result
+		return string(body), nil, response.StatusCode, false, "", err
 	}
-	result.Promotions = promotions
-	return result
+	return string(body), promos, response.StatusCode, false, "", nil
+}
+
+func isStaticFile(path string) bool {
+	path = strings.ToLower(path)
+	extensions := []string{".png", ".jpg", ".jpeg", ".gif", ".svg", ".css", ".js", ".pdf", ".zip", ".mp4", ".mp3", ".ico", ".woff", ".woff2", ".ttf"}
+	for _, ext := range extensions {
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractLinks(htmlContent, baseURL string) []string {
+	var links []string
+	re := regexp.MustCompile(`(?i)<a\s+[^>]*href=["']([^"']+)["']`)
+	matches := re.FindAllStringSubmatch(htmlContent, -1)
+
+	baseParsed, err := url.Parse(baseURL)
+	if err != nil {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	for _, match := range matches {
+		href := strings.TrimSpace(match[1])
+		if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "javascript:") || strings.HasPrefix(href, "mailto:") || strings.HasPrefix(href, "tel:") {
+			continue
+		}
+
+		resolved := resolveURL(baseURL, href)
+		parsedResolved, err := url.Parse(resolved)
+		if err != nil {
+			continue
+		}
+
+		// Only follow http/https
+		if parsedResolved.Scheme != "http" && parsedResolved.Scheme != "https" {
+			continue
+		}
+
+		// Only internal links (same host/domain)
+		if parsedResolved.Host != baseParsed.Host {
+			continue
+		}
+
+		// Skip static files
+		if isStaticFile(parsedResolved.Path) {
+			continue
+		}
+
+		// Normalize URL by removing fragment
+		parsedResolved.Fragment = ""
+		// Normalize trailing slash to avoid duplicate crawling
+		path := parsedResolved.Path
+		if len(path) > 1 && strings.HasSuffix(path, "/") {
+			parsedResolved.Path = path[:len(path)-1]
+		}
+		normalized := parsedResolved.String()
+
+		if !seen[normalized] {
+			seen[normalized] = true
+			links = append(links, normalized)
+		}
+	}
+	return links
 }
 
 func ExtractPromotions(definition sites.Definition, html string, matchedAt time.Time) ([]Promotion, error) {
