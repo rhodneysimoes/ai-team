@@ -221,6 +221,12 @@ func TestExtractPromotionsFromNextData(t *testing.T) {
 	if promotions[1].URL != "https://www.kabum.com.br/produto/monitor" {
 		t.Errorf("promotions[1].URL = %q", promotions[1].URL)
 	}
+	if promotions[1].Price != 1800.00 {
+		t.Errorf("promotions[1].Price = %f, want 1800.00", promotions[1].Price)
+	}
+	if promotions[1].OriginalPrice != 2000.00 {
+		t.Errorf("promotions[1].OriginalPrice = %f, want 2000.00", promotions[1].OriginalPrice)
+	}
 }
 
 func TestCollect(t *testing.T) {
@@ -284,5 +290,56 @@ func TestCollectReportsBlockedResponse(t *testing.T) {
 	}
 	if results[0].StatusCode != http.StatusForbidden {
 		t.Fatalf("StatusCode = %d, want %d", results[0].StatusCode, http.StatusForbidden)
+	}
+}
+
+func TestExtractPricesFromText(t *testing.T) {
+	tests := []struct {
+		text          string
+		wantPrice     float64
+		wantOrigPrice float64
+	}{
+		{
+			text:          "Placa de Vídeo PCyes NVIDIA RTX 2060 - De: R$ 1764.69 Por: R$ 1499.99",
+			wantPrice:     1499.99,
+			wantOrigPrice: 1764.69,
+		},
+		{
+			text:          "Gabinete Gamer Liketec Cygnus Dark - De: R$ 366.66 Por: R$ 329.99",
+			wantPrice:     329.99,
+			wantOrigPrice: 366.66,
+		},
+		{
+			text:          "Smart TV LED 50 - de R$2.500,00 por R$ 1.899,90",
+			wantPrice:     1899.90,
+			wantOrigPrice: 2500.00,
+		},
+		{
+			text:          "Smartphone Motorola Moto G - por R$ 899",
+			wantPrice:     899.0,
+			wantOrigPrice: 0.0,
+		},
+		{
+			text:          "Fone de Ouvido Bluetooth JBL - R$ 199,90",
+			wantPrice:     199.90,
+			wantOrigPrice: 0.0,
+		},
+		{
+			text:          "Sem preço definido no texto",
+			wantPrice:     0.0,
+			wantOrigPrice: 0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.text, func(t *testing.T) {
+			gotPrice, gotOrigPrice := extractPricesFromText(tt.text)
+			if gotPrice != tt.wantPrice {
+				t.Errorf("extractPricesFromText() gotPrice = %v, want %v", gotPrice, tt.wantPrice)
+			}
+			if gotOrigPrice != tt.wantOrigPrice {
+				t.Errorf("extractPricesFromText() gotOrigPrice = %v, want %v", gotOrigPrice, tt.wantOrigPrice)
+			}
+		})
 	}
 }
