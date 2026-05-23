@@ -18,12 +18,14 @@ Como contornar bloqueios do Cloudflare de forma robusta e obter informações de
 - **Regex para Preços:** As expressões regulares `[0-9]+(?:[.,][0-9]+)*` mostraram-se seguras para extrair preços com separadores tanto no formato brasileiro (`R$ 1.899,90`) quanto no americano (`1499.99`).
 - **Redução de Análise:** Ao consultarem as notas estruturadas de RAG e avaliações de Hardness existentes, os agentes reduzem o escopo de análise em tarefas subsequentes.
 - **Idioma dos PRs:** A imposição expressa nos prompts dos agentes garante que as contribuições e revisões de código de toda a equipe de agentes gerem PRs com títulos e descrições uniformemente localizados em Português do Brasil (pt-br).
+- **Ativação da Kabum:** O site da Kabum foi reabilitado no fluxo de scraping através da modificação da coluna `enabled` em `sites.md`.
 
 ## Decisao Influenciada
 
 - Adotou-se o uso do `chromedp` de forma condicional como um fallback de auto-recuperação (self-healing), preservando a requisição HTTP comum como padrão rápido e de baixo consumo de recursos.
 - Configuração de instruções de agentes para manter `hardness/assessment.md` e `rag/context-notes.md` sincronizados no fim do processo de documentação.
 - Padronização de requisitos idiomáticos no Orchestrator e na Documentation abrangendo títulos e descrições de PRs.
+- Habilitação da coleta concorrente de todos os três grandes e-commerces (Kabum, Pichau e Terabyte Shop) simultaneamente no fluxo principal.
 
 ## Confianca
 
