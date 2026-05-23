@@ -1,3 +1,5 @@
 promotions.json
+menor_preco.json
+maior_preco.json
 *.test
 coverage.out
