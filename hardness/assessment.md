@@ -2,7 +2,7 @@
 
 ## Tarefa
 
-Adicionar extração de preços ao scraper, implementar fallback headless via chromedp para evitar bloqueios do Cloudflare, configurar o token gh para pull requests, atualizar as instruções dos agentes para consultarem e manterem os arquivos RAG/Hardness atualizados, forçar a obrigatoriedade de títulos e descrições de PRs em Português do Brasil (pt-br), e ativar a coleta do site da Kabum em sites.md.
+Adicionar extração de preços ao scraper, implementar fallback headless via chromedp para evitar bloqueios do Cloudflare, configurar o token gh para pull requests, atualizar as instruções dos agentes para consultarem e manterem os arquivos RAG/Hardness atualizados, forçar a obrigatoriedade de títulos e descrições de PRs em Português do Brasil (pt-br), ativar a coleta do site da Kabum em sites.md e filtrar promoções sem preço no arquivo de saída promotions.json.
 
 ## Nivel
 

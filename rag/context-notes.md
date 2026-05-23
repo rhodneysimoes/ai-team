@@ -2,7 +2,7 @@
 
 ## Pergunta
 
-Como contornar bloqueios do Cloudflare de forma robusta e obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go?
+Como contornar bloqueios do Cloudflare de forma robusta, obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go, e evitar registros sem preço (incompletos) no arquivo promotions.json?
 
 ## Fontes Consultadas
 
@@ -19,6 +19,7 @@ Como contornar bloqueios do Cloudflare de forma robusta e obter informações de
 - **Redução de Análise:** Ao consultarem as notas estruturadas de RAG e avaliações de Hardness existentes, os agentes reduzem o escopo de análise em tarefas subsequentes.
 - **Idioma dos PRs:** A imposição expressa nos prompts dos agentes garante que as contribuições e revisões de código de toda a equipe de agentes gerem PRs com títulos e descrições uniformemente localizados em Português do Brasil (pt-br).
 - **Ativação da Kabum:** O site da Kabum foi reabilitado no fluxo de scraping através da modificação da coluna `enabled` em `sites.md`.
+- **Filtro de Preço no Output:** A inserção de promoções sem preço (Price <= 0) no JSON de saída causa inconsistências na base de dados. Um filtro adicionado no CLI principal (`cmd/promoscraper/main.go`) remove os itens que não tiveram preço detectado ou que possuem valor inválido.
 
 ## Decisao Influenciada
 
@@ -26,6 +27,7 @@ Como contornar bloqueios do Cloudflare de forma robusta e obter informações de
 - Configuração de instruções de agentes para manter `hardness/assessment.md` e `rag/context-notes.md` sincronizados no fim do processo de documentação.
 - Padronização de requisitos idiomáticos no Orchestrator e na Documentation abrangendo títulos e descrições de PRs.
 - Habilitação da coleta concorrente de todos os três grandes e-commerces (Kabum, Pichau e Terabyte Shop) simultaneamente no fluxo principal.
+- Implementação da filtragem de preços na camada de persistência em arquivo do CLI, mantendo o parseador resiliente para testes unitários com mocks sem preço, mas preservando apenas itens precificados válidos na saída final.
 
 ## Confianca
 
