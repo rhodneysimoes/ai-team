@@ -113,6 +113,13 @@ func TestRun(t *testing.T) {
 					Price:     80,
 					MatchedAt: time.Now().UTC(),
 				},
+				{
+					Site:      "Store A",
+					URL:       "https://storea.com/prod3",
+					Text:      "Monitor UltraWide De: R$ 3000 Por: R$ 2500", // Unique product
+					Price:     2500,
+					MatchedAt: time.Now().UTC(),
+				},
 			},
 		},
 		{
@@ -159,13 +166,13 @@ func TestRun(t *testing.T) {
 	if err := json.Unmarshal(minBytes, &minPromos); err != nil {
 		t.Fatalf("unmarshal menor.json: %v", err)
 	}
-	if len(minPromos) != 2 {
-		t.Fatalf("len(minPromos) = %d, want 2", len(minPromos))
+	if len(minPromos) != 3 {
+		t.Fatalf("len(minPromos) = %d, want 3", len(minPromos))
 	}
 	// Sorted by canonical product name:
-	// "mouse rgb gamer" -> "mouse rgb gamer" (Store A: 80, Store B: 90) -> Min is 80 (Store A)
-	// "teclado gamer mecanico rgb" -> "gamer rgb mecanico teclado" (Store A: 150, Store B: 130) -> Min is 130 (Store B)
-	// Let's verify prices:
+	// "gamer mecanico rgb teclado" (keyboard) -> Min is 130 (Store B)
+	// "gamer mouse rgb" (mouse) -> Min is 80 (Store A)
+	// "monitor ultrawide" (monitor, unique) -> Min is 2500 (Store A)
 	if minPromos[0].Price != 130 {
 		t.Errorf("expected keyboard min price to be 130, got %f", minPromos[0].Price)
 	}
@@ -178,6 +185,12 @@ func TestRun(t *testing.T) {
 	if minPromos[1].Site != "Store A" {
 		t.Errorf("expected mouse min site to be Store A, got %s", minPromos[1].Site)
 	}
+	if minPromos[2].Price != 2500 {
+		t.Errorf("expected monitor min price to be 2500, got %f", minPromos[2].Price)
+	}
+	if minPromos[2].Site != "Store A" {
+		t.Errorf("expected monitor min site to be Store A, got %s", minPromos[2].Site)
+	}
 
 	// Verify maior.json
 	maxBytes, err := os.ReadFile(maxOutPath)
@@ -188,6 +201,7 @@ func TestRun(t *testing.T) {
 	if err := json.Unmarshal(maxBytes, &maxPromos); err != nil {
 		t.Fatalf("unmarshal maior.json: %v", err)
 	}
+	// Should only have 2 items (monitor is unique, so excluded)
 	if len(maxPromos) != 2 {
 		t.Fatalf("len(maxPromos) = %d, want 2", len(maxPromos))
 	}
