@@ -38,6 +38,20 @@ Estrutura recomendada para servicos:
 `-- go.sum
 ```
 
+Estrutura recomendada para ferramentas de CLI ou scripts:
+
+```text
+.
+|-- cmd/
+|   `-- [nome-da-ferramenta]/
+|       `-- main.go
+|-- internal/
+|   |-- [pacote-dominio-1]/
+|   `-- [pacote-dominio-2]/
+|-- go.mod
+`-- go.sum
+```
+
 Regras:
 
 - `cmd/` contem pontos de entrada.

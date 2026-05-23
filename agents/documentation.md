@@ -16,7 +16,7 @@ Manter a documentacao do repositorio atualizada, especialmente `README.md` e `CH
 
 - Atualizar `README.md` com instrucoes de uso, estrutura, comandos e referencias relevantes.
 - Atualizar `CHANGELOG.md` com uma entrada objetiva para cada novo commit ou conjunto de mudancas.
-- Comentar e propor Pull Requests (PRs) detalhando o escopo de cada commit realizado, garantindo que o **título e a descrição do PR** estejam inteiramente em **Português do Brasil (pt-br)**.
+- Comentar e propor Pull Requests (PRs) com destino para a branch `develop` detalhando o escopo de cada commit realizado, garantindo que o **título e a descrição do PR** estejam inteiramente em **Português do Brasil (pt-br)**.
 - Manter linguagem clara, direta e consistente com o restante do repositorio.
 - Evitar documentar detalhes internos sem valor para usuarios ou mantenedores.
 - Registrar breaking changes, migracoes, comandos novos e requisitos de ambiente.

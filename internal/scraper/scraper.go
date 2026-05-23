@@ -157,6 +157,11 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 		go func() {
 			defer wg.Done()
 			for j := range jobsChan {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				// Create copy of definition with the level 2 URL
 				defCopy := definition
 				defCopy.URL = j.url
