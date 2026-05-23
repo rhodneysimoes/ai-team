@@ -77,6 +77,152 @@ func TestExtractPromotionsUsesTagDescontosImageAsThumbnail(t *testing.T) {
 	}
 }
 
+func TestExtractPromotionsStripsScriptsAndStyles(t *testing.T) {
+	definition := sites.Definition{
+		Name:    "Store A",
+		URL:     "https://example.com",
+		Pattern: `(?i)oferta.{0,40}`,
+		Enabled: true,
+	}
+	html := `<html>
+<head>
+	<script>var oferta_internal = "ignored oferta js";</script>
+	<style>body { content: "oferta css"; }</style>
+</head>
+<body>
+	<h1>Oferta especial real</h1>
+</body>
+</html>`
+
+	promotions, err := ExtractPromotions(definition, html, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promotions) != 1 {
+		t.Fatalf("len(promotions) = %d, want 1", len(promotions))
+	}
+	if promotions[0].Text != "Oferta especial real" {
+		t.Fatalf("promotion text = %q, want 'Oferta especial real'", promotions[0].Text)
+	}
+}
+
+func TestExtractThumbnailPriorityAndCookieExclusion(t *testing.T) {
+	definition := sites.Definition{
+		Name:    "Store A",
+		URL:     "https://example.com",
+		Pattern: `(?i)oferta.{0,40}`,
+		Enabled: true,
+	}
+	// Has cookielaw thumbnail (should be ignored), generic thumbnail, and og:image
+	html := `<html>
+<head>
+	<meta property="og:image" content="https://cdn.example.com/real-og.jpg">
+</head>
+<body>
+	<img class="ot-sdk-thumbnail" src="https://cdn.cookielaw.org/logo.png">
+	<img class="product-thumbnail" src="https://cdn.example.com/generic-thumb.jpg">
+	<h1>Oferta real</h1>
+</body>
+</html>`
+
+	promotions, err := ExtractPromotions(definition, html, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promotions) != 1 {
+		t.Fatalf("len(promotions) = %d, want 1", len(promotions))
+	}
+	// og:image should be selected as it has higher priority, and cookie logo should be skipped
+	if promotions[0].ThumbnailURL != "https://cdn.example.com/real-og.jpg" {
+		t.Fatalf("thumbnail url = %q, want 'https://cdn.example.com/real-og.jpg'", promotions[0].ThumbnailURL)
+	}
+}
+
+func TestExtractPromotionsFromNextData(t *testing.T) {
+	definition := sites.Definition{
+		Name:    "Kabum",
+		URL:     "https://www.kabum.com.br",
+		Pattern: `(?i)(oferta|cupom).{0,40}`,
+		Enabled: true,
+	}
+
+	html := `<html>
+<body>
+	<script id="__NEXT_DATA__" type="application/json">
+	{
+		"props": {
+			"pageProps": {
+				"banners": {
+					"mainBanner": [
+						{
+							"title": "Cupom de Desconto Especial",
+							"banner": "/banners/megamaio.png",
+							"link": "/ofertas/megamaio"
+						}
+					]
+				},
+				"offers": {
+					"products": [
+						{
+							"name": "Monitor Gamer Boreal 34",
+							"thumbnail": "/images/monitor.jpg",
+							"link": "/produto/monitor",
+							"price": 2000.0,
+							"priceWithDiscount": 1800.0,
+							"discountPercentage": 10,
+							"stamp": {
+								"title": "CUPOM MEGA100"
+							}
+						},
+						{
+							"name": "Teclado normal",
+							"thumbnail": "/images/teclado.jpg",
+							"link": "/produto/teclado",
+							"price": 100.0
+						}
+					]
+				}
+			}
+		}
+	}
+	</script>
+</body>
+</html>`
+
+	promotions, err := ExtractPromotions(definition, html, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+
+	// We expect 2 matching promotions: 1 from mainBanner (matches "Cupom"), 1 from product "Monitor Gamer Boreal 34" (matches "CUPOM MEGA100" or the stamp).
+	if len(promotions) != 2 {
+		t.Fatalf("len(promotions) = %d, want 2", len(promotions))
+	}
+
+	// Check Banner Promotion
+	if promotions[0].Text != "Cupom de Desconto Especial" {
+		t.Errorf("promotions[0].Text = %q, want 'Cupom de Desconto Especial'", promotions[0].Text)
+	}
+	if promotions[0].ThumbnailURL != "https://www.kabum.com.br/banners/megamaio.png" {
+		t.Errorf("promotions[0].ThumbnailURL = %q, want 'https://www.kabum.com.br/banners/megamaio.png'", promotions[0].ThumbnailURL)
+	}
+	if promotions[0].URL != "https://www.kabum.com.br/ofertas/megamaio" {
+		t.Errorf("promotions[0].URL = %q", promotions[0].URL)
+	}
+
+	// Check Product Promotion
+	expectedProdText := "Monitor Gamer Boreal 34 (Cupom: CUPOM MEGA100) - 10% OFF - De: R$ 2000.00 Por: R$ 1800.00"
+	if promotions[1].Text != expectedProdText {
+		t.Errorf("promotions[1].Text = %q, want %q", promotions[1].Text, expectedProdText)
+	}
+	if promotions[1].ThumbnailURL != "https://www.kabum.com.br/images/monitor.jpg" {
+		t.Errorf("promotions[1].ThumbnailURL = %q", promotions[1].ThumbnailURL)
+	}
+	if promotions[1].URL != "https://www.kabum.com.br/produto/monitor" {
+		t.Errorf("promotions[1].URL = %q", promotions[1].URL)
+	}
+}
+
 func TestCollect(t *testing.T) {
 	var userAgent string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {

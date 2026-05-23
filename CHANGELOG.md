@@ -6,6 +6,9 @@ Todas as mudancas relevantes deste repositorio devem ser documentadas neste arqu
 
 ### Added
 
+- Adicionado suporte a scraping estruturado de dados Next.js (`__NEXT_DATA__`) no scraper para extrair ofertas e banners limpos em páginas de SPA/hydration (ex: Kabum).
+- Adicionada instrução de obrigatoriedade de idioma PT-BR para todos os agentes especializados em `AGENT.md` e nos perfis individuais.
+- Adicionada instrução ao agente de documentação para comentar em Pull Requests detalhando o escopo de cada commit.
 - Adicionados headers padrao de navegador, headers customizaveis por site e diagnostico de bloqueio HTTP no scraper.
 - Adicionado suporte a `thumbnail_url` no resultado do scraper a partir de tags thumbnail, `og:image` ou `twitter:image`.
 - Adicionado CLI `cmd/promoscraper` para coletar promocoes de sites definidos em `sites.md`.
@@ -19,6 +22,7 @@ Todas as mudancas relevantes deste repositorio devem ser documentadas neste arqu
 
 ### Changed
 
+- Atualizada a prioridade de seleção de miniaturas no scraper para preferir Open Graph e Twitter Image, ignorando links e scripts de privacidade/cookies.
 - Atualizado parser de headers em `sites.md` para aceitar `\;` em valores como `Accept-Language`.
 - Atualizado o padrao da Terabyte em `sites.md` com sinais reais da pagina: percentual OFF, Tera Maio, Termina em, Frete gratis, Mais vendido e preco De/por.
 - Atualizado parser de `sites.md` para aceitar `\|` em regex dentro de tabelas Markdown.

@@ -26,3 +26,7 @@ Garantir que mudancas em Go sejam verificadas por testes claros, rapidos e propo
 - Casos de erro importantes foram cobertos.
 - Fixtures sao pequenas e locais ao teste.
 - Testes nao dependem de ordem, horario real ou rede externa sem controle.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, explicações de testes, relatórios de cobertura e erros descritos devem ser redigidos em **Português do Brasil (pt-br)**.

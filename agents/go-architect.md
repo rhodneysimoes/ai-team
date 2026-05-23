@@ -28,3 +28,7 @@ Definir solucoes tecnicas em Go que sejam simples, idiomaticas, testaveis e alin
 - Contratos principais, entradas, saidas e erros.
 - Riscos e trade-offs.
 - Testes necessarios para validar a decisao.
+
+## Idioma
+
+- **Obrigatoriedade:** Todas as saídas de prompt, desenhos arquiteturais, diagramas e explicações gerados devem ser redigidos em **Português do Brasil (pt-br)**.
