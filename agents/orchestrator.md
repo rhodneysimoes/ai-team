@@ -44,4 +44,4 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 
 ## Idioma
 
-- **Obrigatoriedade:** Toda e qualquer saída de prompt, plano de execução, relatório ou explicação gerada por este agente ou por seus especialistas acionados deve ser redigida em **Português do Brasil (pt-br)**.
+- **Obrigatoriedade:** Toda e qualquer saída de prompt, plano de execução, relatório, explicação, bem como **títulos e descrições de Pull Requests (PRs)** criados ou propostos por este agente ou por seus especialistas acionados devem ser obrigatoriamente redigidos em **Português do Brasil (pt-br)**.
