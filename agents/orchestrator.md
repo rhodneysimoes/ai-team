@@ -32,6 +32,7 @@ Coordenar agentes especializados para transformar uma solicitacao em uma entrega
 5. Integre as respostas em um plano de execucao objetivo.
 6. Antes de commit ou entrega final, confirme se `README.md`, `CHANGELOG.md`, `hardness/assessment.md` e `rag/context-notes.md` precisam ser criados ou atualizados com as informações da tarefa atual.
 7. Confirme a entrega com testes ou explique por que nao puderam ser executados.
+8. Sempre que realizar um commit/push, certifique-se de que há um Pull Request (PR) aberto com destino para a branch `develop`, criando-o ou atualizando-o conforme necessário.
 
 ## Criterios De Pronto
 
