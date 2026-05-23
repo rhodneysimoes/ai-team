@@ -2,7 +2,7 @@
 
 ## Pergunta
 
-Como contornar bloqueios do Cloudflare de forma robusta, obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go, evitar registros sem preço (incompletos) no arquivo promotions.json, estender a coleta recursiva para todas as subpáginas internas (Nível 2), e garantir que o projeto e o SDD estejam alinhados em boas práticas de concorrência e tratamento de erros?
+Como contornar bloqueios do Cloudflare de forma robusta, obter informações de preço sem comprometer a simplicidade e a performance padrão do scraper Go, evitar registros sem preço (incompletos) no arquivo promotions.json, estender a coleta recursiva para todas as subpáginas internas (Nível 2), garantir que o projeto e o SDD estejam alinhados, e criar um agrupador e comparador de menor/maior preço por produto?
 
 ## Fontes Consultadas
 
@@ -24,6 +24,7 @@ Como contornar bloqueios do Cloudflare de forma robusta, obter informações de 
 - **Concurrency Worker Pool:** O fetch simultâneo das subpáginas do Nível 2 é executado de forma concorrente em cada site por meio de um pool com limite de 5 workers para otimizar velocidade e gerenciar o tempo limite geral de forma limpa.
 - **Alinhamento SDD vs Código:** Identificamos que erros de parsing de URL no pacote `sites` não usavam o operador `%w` recomendado no SDD, e o pool de workers concorrente do Nível 2 continuava consumindo a fila mesmo após o cancelamento do contexto.
 - **Cancelamento Imediato Concorrente:** A verificação de `ctx.Done()` na fila concorrente de Nível 2 evita consumo desnecessário de CPU após timeouts.
+- **Normalização de Textos:** Para agrupar produtos descritos com ligeiras variações, desenvolvemos um algoritmo de limpeza (removendo tags de marketing, cupons, preços antigos) e geramos chaves de comparação a partir das palavras ordenadas alfabeticamente. Isso provou-se altamente eficaz para unificar itens semelhantes de fontes diferentes.
 
 ## Decisao Influenciada
 
@@ -36,6 +37,7 @@ Como contornar bloqueios do Cloudflare de forma robusta, obter informações de 
 - Inclusão da estrutura recomendada de projetos CLI e utilitários na Seção 3 do SDD para refletir o layout do repositório.
 - Refatoração da função `parseDefinition` para encapsular erros de URL com `%w`.
 - Inclusão de verificação `select { case <-ctx.Done(): return; default: }` na goroutine dos workers de nível 2.
+- Criação do utilitário `cmd/pricecomparator/main.go` para agrupar promoções de forma order-independent e gerar deterministamente os arquivos `menor_preco.json` e `maior_preco.json`.
 
 ## Confianca
 
