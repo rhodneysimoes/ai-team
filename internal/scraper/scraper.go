@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/rhodneysimoes/ai-team/internal/sites"
 )
 
@@ -23,11 +24,13 @@ type Options struct {
 }
 
 type Promotion struct {
-	Site         string    `json:"site"`
-	URL          string    `json:"url"`
-	Text         string    `json:"text"`
-	ThumbnailURL string    `json:"thumbnail_url,omitempty"`
-	MatchedAt    time.Time `json:"matched_at"`
+	Site          string    `json:"site"`
+	URL           string    `json:"url"`
+	Text          string    `json:"text"`
+	ThumbnailURL  string    `json:"thumbnail_url,omitempty"`
+	Price         float64   `json:"price,omitempty"`
+	OriginalPrice float64   `json:"original_price,omitempty"`
+	MatchedAt     time.Time `json:"matched_at"`
 }
 
 type SiteResult struct {
@@ -114,6 +117,19 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 
 	response, err := client.Do(request)
 	if err != nil {
+		// Try browser fallback on connection failure
+		htmlContent, browserErr := fetchWithBrowser(ctx, definition.URL)
+		if browserErr == nil {
+			stillBlocked, _ := detectBlockedResponse(nil, htmlContent)
+			if !stillBlocked {
+				promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
+				if extractErr == nil {
+					result.StatusCode = http.StatusOK
+					result.Promotions = promotions
+					return result
+				}
+			}
+		}
 		result.Error = err.Error()
 		return result
 	}
@@ -122,8 +138,30 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
-		result.Blocked, result.BlockReason = detectBlockedResponse(response, string(body))
+		blocked, blockReason := detectBlockedResponse(response, string(body))
+		result.Blocked = blocked
+		result.BlockReason = blockReason
 		result.Error = fmt.Sprintf("unexpected status %s", response.Status)
+
+		if blocked {
+			htmlContent, browserErr := fetchWithBrowser(ctx, definition.URL)
+			if browserErr == nil {
+				stillBlocked, stillBlockedReason := detectBlockedResponse(nil, htmlContent)
+				if !stillBlocked {
+					promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
+					if extractErr == nil {
+						result.Blocked = false
+						result.BlockReason = ""
+						result.Error = ""
+						result.StatusCode = http.StatusOK
+						result.Promotions = promotions
+						return result
+					}
+				} else {
+					result.BlockReason = "browser fallback also blocked: " + stillBlockedReason
+				}
+			}
+		}
 		return result
 	}
 
@@ -173,12 +211,15 @@ func ExtractPromotions(definition sites.Definition, html string, matchedAt time.
 			continue
 		}
 		seen[clean] = struct{}{}
+		price, originalPrice := extractPricesFromText(clean)
 		promotions = append(promotions, Promotion{
-			Site:         definition.Name,
-			URL:          definition.URL,
-			Text:         clean,
-			ThumbnailURL: thumbnailURL,
-			MatchedAt:    matchedAt,
+			Site:          definition.Name,
+			URL:           definition.URL,
+			Text:          clean,
+			ThumbnailURL:  thumbnailURL,
+			Price:         price,
+			OriginalPrice: originalPrice,
+			MatchedAt:     matchedAt,
 		})
 	}
 
@@ -218,10 +259,15 @@ func applyRequestHeaders(request *http.Request, definition sites.Definition) {
 
 func detectBlockedResponse(response *http.Response, body string) (bool, string) {
 	lowerBody := strings.ToLower(body)
-	server := strings.ToLower(response.Header.Get("Server"))
+	var server string
+	var statusCode int
+	if response != nil {
+		server = strings.ToLower(response.Header.Get("Server"))
+		statusCode = response.StatusCode
+	}
 
 	switch {
-	case response.StatusCode == http.StatusForbidden && strings.Contains(server, "cloudflare"):
+	case response != nil && statusCode == http.StatusForbidden && strings.Contains(server, "cloudflare"):
 		return true, "cloudflare returned 403"
 	case strings.Contains(lowerBody, "enable javascript and cookies"):
 		return true, "javascript or cookie challenge"
@@ -229,7 +275,7 @@ func detectBlockedResponse(response *http.Response, body string) (bool, string) 
 		return true, "cloudflare challenge page"
 	case strings.Contains(lowerBody, "cf-chl"):
 		return true, "cloudflare challenge token"
-	case response.StatusCode == http.StatusTooManyRequests:
+	case response != nil && statusCode == http.StatusTooManyRequests:
 		return true, "rate limited"
 	default:
 		return false, ""
@@ -462,15 +508,121 @@ func tryExtractNextData(definition sites.Definition, htmlContent string, express
 			}
 			seen[text] = struct{}{}
 
+			var price float64
+			var originalPrice float64
+			if prod.PriceWithDiscount > 0 {
+				price = prod.PriceWithDiscount
+				originalPrice = prod.Price
+			} else if prod.Price > 0 {
+				price = prod.Price
+			}
+
 			promotions = append(promotions, Promotion{
-				Site:         definition.Name,
-				URL:          resolveURL(pageURL, prod.Link),
-				Text:         normalizeText(text),
-				ThumbnailURL: resolveURL(pageURL, prod.Thumbnail),
-				MatchedAt:    matchedAt,
+				Site:          definition.Name,
+				URL:           resolveURL(pageURL, prod.Link),
+				Text:          normalizeText(text),
+				ThumbnailURL:  resolveURL(pageURL, prod.Thumbnail),
+				Price:         price,
+				OriginalPrice: originalPrice,
+				MatchedAt:     matchedAt,
 			})
 		}
 	}
 
 	return promotions, len(promotions) > 0
+}
+
+func parsePrice(s string) float64 {
+	s = strings.TrimSpace(s)
+	// Remove non-numeric/non-punctuation characters except dots and commas
+	var sb strings.Builder
+	for _, r := range s {
+		if (r >= '0' && r <= '9') || r == '.' || r == ',' {
+			sb.WriteRune(r)
+		}
+	}
+	cleaned := sb.String()
+	if cleaned == "" {
+		return 0
+	}
+
+	// Determine decimal separator
+	lastDot := strings.LastIndex(cleaned, ".")
+	lastComma := strings.LastIndex(cleaned, ",")
+
+	if lastComma > lastDot {
+		// Comma is the decimal separator (Brazilian format: e.g. 1.764,69 or 1764,69)
+		// Remove all dots (thousands separator), then replace comma with dot
+		cleaned = strings.ReplaceAll(cleaned, ".", "")
+		cleaned = strings.ReplaceAll(cleaned, ",", ".")
+	} else if lastDot > lastComma {
+		// Dot is the decimal separator (English format: e.g. 1,764.69 or 1764.69)
+		// Remove all commas (thousands separator)
+		cleaned = strings.ReplaceAll(cleaned, ",", "")
+	} else {
+		// No separators or only one type which is at the end.
+		// If there's only comma, replace with dot
+		cleaned = strings.ReplaceAll(cleaned, ",", ".")
+	}
+
+	var val float64
+	fmt.Sscanf(cleaned, "%f", &val)
+	return val
+}
+
+func extractPricesFromText(text string) (price float64, originalPrice float64) {
+	// Try to find "de: ... por: ..." patterns (with optional colons, optional spaces, optional R$)
+	dePorRegex := regexp.MustCompile(`(?i)\bde:?\s*(?:r\$\s*)?([0-9]+(?:[.,][0-9]+)*)\s+por:?\s*(?:r\$\s*)?([0-9]+(?:[.,][0-9]+)*)`)
+	matches := dePorRegex.FindStringSubmatch(text)
+	if len(matches) >= 3 {
+		originalPrice = parsePrice(matches[1])
+		price = parsePrice(matches[2])
+		return price, originalPrice
+	}
+
+	// Try to find any price preceded by R$ or "por R$" or "por "
+	priceRegex := regexp.MustCompile(`(?i)(?:r\$\s*|por\s+r\$\s*|por\s+)([0-9]+(?:[.,][0-9]+)*)`)
+	priceMatches := priceRegex.FindAllStringSubmatch(text, -1)
+	if len(priceMatches) > 0 {
+		price = parsePrice(priceMatches[0][1])
+		return price, 0
+	}
+
+	return 0, 0
+}
+
+func fetchWithBrowser(ctx context.Context, urlStr string) (string, error) {
+	// Create context with a timeout so it doesn't hang forever
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// Configure chromedp options to run headlessly and bypass sandboxing
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+		chromedp.Flag("disable-setuid-sandbox", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("blink-settings", "imagesEnabled=false"), // Save bandwidth/speed up
+		chromedp.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36"),
+	)
+
+	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer allocCancel()
+
+	chromeCtx, chromeCancel := chromedp.NewContext(allocCtx)
+	defer chromeCancel()
+
+	var htmlContent string
+	err := chromedp.Run(chromeCtx,
+		chromedp.Navigate(urlStr),
+		chromedp.WaitVisible("body", chromedp.ByQuery),
+		chromedp.Sleep(5*time.Second), // Sleep to allow JS execution/Cloudflare solve
+		chromedp.OuterHTML("html", &htmlContent, chromedp.ByQuery),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return htmlContent, nil
 }
