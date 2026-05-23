@@ -23,7 +23,7 @@ Regras:
 
 | name | url | pattern | enabled | headers |
 | --- | --- | --- | --- | --- |
-| Kabum | https://www.kabum.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | false | |
+| Kabum | https://www.kabum.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | true | |
 | Pichau | https://www.pichau.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | true | |
 | Terabyte Shop | https://www.terabyteshop.com.br | (?i)(promocao\|promo\|oferta\|desconto\|cupom\|black friday\|frete gratis).{0,160} | true | Accept-Language=pt-BR,pt\;q=0.9 |
 

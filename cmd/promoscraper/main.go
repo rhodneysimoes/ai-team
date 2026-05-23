@@ -45,6 +45,19 @@ func run(sitesPath, outputPath string, timeout time.Duration, concurrency int) e
 		return fmt.Errorf("collect promotions: %w", err)
 	}
 
+	for i := range results {
+		var filtered []scraper.Promotion
+		if results[i].Promotions != nil {
+			filtered = []scraper.Promotion{}
+			for _, promo := range results[i].Promotions {
+				if promo.Price > 0 {
+					filtered = append(filtered, promo)
+				}
+			}
+		}
+		results[i].Promotions = filtered
+	}
+
 	data, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode results: %w", err)
