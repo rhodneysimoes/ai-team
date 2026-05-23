@@ -343,3 +343,43 @@ func TestExtractPricesFromText(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectLevel2(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/" {
+			_, _ = w.Write([]byte(`<html><body><a href="/promo-page">Link to Promo</a></body></html>`))
+		} else if request.URL.Path == "/promo-page" {
+			_, _ = w.Write([]byte(`<html><body><p>Oferta relampago com frete gratis</p></body></html>`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	results, err := Collect(context.Background(), server.Client(), []sites.Definition{
+		{
+			Name:    "Store B",
+			URL:     server.URL,
+			Pattern: `(?i)oferta.{0,40}`,
+			Enabled: true,
+		},
+	}, Options{Concurrency: 1})
+
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	if len(results[0].Promotions) != 1 {
+		t.Fatalf("len(results[0].Promotions) = %d, want 1, got %d", len(results[0].Promotions), len(results[0].Promotions))
+	}
+	if results[0].Promotions[0].Text != "Oferta relampago com frete gratis" {
+		t.Fatalf("promotion text = %q, want 'Oferta relampago com frete gratis'", results[0].Promotions[0].Text)
+	}
+	// The URL should point to the promo-page
+	if !strings.HasSuffix(results[0].Promotions[0].URL, "/promo-page") {
+		t.Fatalf("promotion url = %q, want suffix '/promo-page'", results[0].Promotions[0].URL)
+	}
+}
+
