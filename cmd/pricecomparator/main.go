@@ -79,7 +79,9 @@ func run(inputPath, minOutPath, maxOutPath string) error {
 		}
 
 		minPromos = append(minPromos, minPromo)
-		maxPromos = append(maxPromos, maxPromo)
+		if maxPromo.Price > minPromo.Price {
+			maxPromos = append(maxPromos, maxPromo)
+		}
 	}
 
 	// Write menor_preco.json
