@@ -386,6 +386,39 @@ func ExtractPromotions(definition sites.Definition, html string, matchedAt time.
 		})
 	}
 
+	if isProductURL(definition.URL) {
+		price, originalPrice := extractPricesFromText(text)
+		if originalPrice > 0 && price > 0 && originalPrice > price {
+			discount := ((originalPrice - price) / originalPrice) * 100
+			if discount > 9 {
+				hasPromo := false
+				for _, p := range promotions {
+					if p.URL == definition.URL {
+						hasPromo = true
+						break
+					}
+				}
+				if !hasPromo {
+					prodText := extractTitle(html)
+					if prodText == "" {
+						prodText = "Produto em Oferta"
+					}
+					prodText = cleanTitle(prodText)
+					prodText = fmt.Sprintf("%s - De: R$ %.2f Por: R$ %.2f", prodText, originalPrice, price)
+					promotions = append(promotions, Promotion{
+						Site:          definition.Name,
+						URL:           definition.URL,
+						Text:          normalizeText(prodText),
+						ThumbnailURL:  thumbnailURL,
+						Price:         price,
+						OriginalPrice: originalPrice,
+						MatchedAt:     matchedAt,
+					})
+				}
+			}
+		}
+	}
+
 	return promotions, nil
 }
 
@@ -665,7 +698,17 @@ func tryExtractNextData(definition sites.Definition, htmlContent string, express
 			text += fmt.Sprintf(" - R$ %.2f", prod.Price)
 		}
 
-		if expression.MatchString(text) || expression.MatchString(prod.Link) || (prod.Stamp != nil && expression.MatchString(prod.Stamp.Title)) {
+		hasDiscountOver9 := prod.DiscountPercentage > 9
+		if prod.Price > 0 && prod.PriceWithDiscount > 0 && prod.Price > prod.PriceWithDiscount {
+			calcDisc := ((prod.Price - prod.PriceWithDiscount) / prod.Price) * 100
+			if calcDisc > 9 {
+				hasDiscountOver9 = true
+			}
+		}
+
+		matchesPattern := expression.MatchString(text) || expression.MatchString(prod.Link) || (prod.Stamp != nil && expression.MatchString(prod.Stamp.Title))
+
+		if matchesPattern || hasDiscountOver9 {
 			if _, ok := seen[text]; ok {
 				continue
 			}
@@ -870,4 +913,24 @@ func isProductURL(urlStr string) bool {
 
 	return true
 }
+
+// extractTitle extrai o conteúdo da tag <title> do HTML de uma página.
+func extractTitle(htmlContent string) string {
+	re := regexp.MustCompile(`(?i)<title>(.*?)</title>`)
+	match := re.FindStringSubmatch(htmlContent)
+	if len(match) > 1 {
+		return html.UnescapeString(strings.TrimSpace(match[1]))
+	}
+	return ""
+}
+
+// cleanTitle limpa o título do produto removendo sufixos e identificadores das lojas.
+func cleanTitle(title string) string {
+	title = strings.ReplaceAll(title, " - Pichau", "")
+	title = strings.ReplaceAll(title, " | Kabum", "")
+	title = strings.ReplaceAll(title, " - Terabyte Shop", "")
+	title = strings.ReplaceAll(title, " - Terabyteshop", "")
+	return strings.TrimSpace(title)
+}
+
 

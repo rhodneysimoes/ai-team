@@ -452,5 +452,38 @@ func TestCollectDeduplicatesByURL(t *testing.T) {
 	}
 }
 
+func TestExtractPromotionsWith9PercentDiscount(t *testing.T) {
+	definition := sites.Definition{
+		Name:    "Kabum",
+		URL:     "https://www.kabum.com.br/produto/123/mouse-gamer",
+		Pattern: `(?i)oferta_nao_existente`,
+		Enabled: true,
+	}
+
+	// 1. Desconto maior que 9% (20%): deve capturar
+	htmlOver := `<html><head><title>Mouse Gamer Redragon</title></head><body>De: R$ 100 Por: R$ 80</body></html>`
+	promosOver, err := ExtractPromotions(definition, htmlOver, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promosOver) != 1 {
+		t.Fatalf("expected 1 promotion for >9%% discount, got %d", len(promosOver))
+	}
+	if promosOver[0].Price != 80 || promosOver[0].OriginalPrice != 100 {
+		t.Errorf("wrong prices: got price=%f, orig=%f", promosOver[0].Price, promosOver[0].OriginalPrice)
+	}
+
+	// 2. Desconto de 9% ou menor (5%): não deve capturar
+	htmlUnder := `<html><head><title>Mouse Gamer Redragon</title></head><body>De: R$ 100 Por: R$ 95</body></html>`
+	promosUnder, err := ExtractPromotions(definition, htmlUnder, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promosUnder) != 0 {
+		t.Fatalf("expected 0 promotions for <=9%% discount, got %d", len(promosUnder))
+	}
+}
+
+
 
 
