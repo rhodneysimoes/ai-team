@@ -383,3 +383,37 @@ func TestCollectLevel2(t *testing.T) {
 	}
 }
 
+func TestIsProductURL(t *testing.T) {
+	tests := []struct {
+		urlStr string
+		want   bool
+	}{
+		// Kabum
+		{"https://www.kabum.com.br/produto/12345/mouse-gamer", true},
+		{"https://www.kabum.com.br/hardware/coolers", false},
+		{"https://www.kabum.com.br/promocao/maisvendidos", false},
+		// Terabyte
+		{"https://www.terabyteshop.com.br/produto/54321/teclado-mecanico", true},
+		{"https://www.terabyteshop.com.br/categoria/hardware", false},
+		// Pichau
+		{"https://www.pichau.com.br/suporte-para-monitor-zinnia-tms-90-17-pol-a-32-pol-preto-zno-tms90-bl01", true},
+		{"https://www.pichau.com.br/mesa-gamer-brateck-120cm-preto-brateck-gmd15-19", true},
+		{"https://www.pichau.com.br/monitores", false},
+		{"https://www.pichau.com.br/cadeiras/gamer", false},
+		{"https://www.pichau.com.br/search?q=mouse", false},
+		// Mocks / Others
+		{"https://example.com/some-path", true},
+		{"http://127.0.0.1:8080/test", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.urlStr, func(t *testing.T) {
+			got := isProductURL(tt.urlStr)
+			if got != tt.want {
+				t.Errorf("isProductURL(%q) = %v, want %v", tt.urlStr, got, tt.want)
+			}
+		})
+	}
+}
+
+

@@ -195,6 +195,15 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 		}
 	}
 
+	// Filter promotions to only keep those that are single product pages
+	var filteredPromos []Promotion
+	for _, p := range result.Promotions {
+		if isProductURL(p.URL) {
+			filteredPromos = append(filteredPromos, p)
+		}
+	}
+	result.Promotions = filteredPromos
+
 	return result
 }
 
@@ -318,9 +327,11 @@ func extractLinks(htmlContent, baseURL string) []string {
 		}
 		normalized := parsedResolved.String()
 
-		if !seen[normalized] {
-			seen[normalized] = true
-			links = append(links, normalized)
+		if isProductURL(normalized) {
+			if !seen[normalized] {
+				seen[normalized] = true
+				links = append(links, normalized)
+			}
 		}
 	}
 	return links
@@ -778,3 +789,81 @@ func fetchWithBrowser(ctx context.Context, urlStr string) (string, error) {
 
 	return htmlContent, nil
 }
+
+// isProductURL verifica se a URL fornecida pertence a uma página de produto único
+// para os e-commerces suportados (Kabum, Terabyte, Pichau).
+func isProductURL(urlStr string) bool {
+	parsed, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+
+	host := strings.ToLower(parsed.Host)
+	path := strings.ToLower(parsed.Path)
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return false
+	}
+
+	// Permite URLs de outros hosts para compatibilidade com mocks de testes unitários
+	if !strings.Contains(host, "kabum.com.br") &&
+		!strings.Contains(host, "terabyteshop.com.br") &&
+		!strings.Contains(host, "pichau.com.br") {
+		return true
+	}
+
+	// Para Kabum e Terabyte, as URLs de produto contêm o segmento "/produto/"
+	if strings.Contains(host, "kabum.com.br") || strings.Contains(host, "terabyteshop.com.br") {
+		segments := strings.Split(path, "/")
+		for _, seg := range segments {
+			if seg == "produto" {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Para a Pichau, as URLs de produto estão na raiz (apenas 1 segmento de slug)
+	// e possuem pelo menos 3 hifens (identificando o modelo/nome do produto),
+	// excluindo páginas estáticas conhecidas e categorias.
+	if strings.Contains(host, "pichau.com.br") {
+		segments := strings.Split(path, "/")
+		if len(segments) != 1 {
+			return false
+		}
+		slug := segments[0]
+
+		// Exclui páginas administrativas, de busca ou categorias conhecidas
+		ignored := map[string]bool{
+			"search":         true,
+			"openbox":        true,
+			"monitores":      true,
+			"cadeiras":       true,
+			"perifericos":    true,
+			"vestuario":      true,
+			"redes-wireless": true,
+			"casa-e-lazer":   true,
+			"computadores":   true,
+			"hardware":       true,
+			"fontes":         true,
+			"gabinete":       true,
+			"placa-de-video": true,
+			"noticias":       true,
+			"atendimento":    true,
+			"contato":        true,
+			"sobre":          true,
+		}
+		if ignored[slug] {
+			return false
+		}
+
+		// Geralmente slugs de produtos possuem múltiplos hifens para descrever o item
+		if strings.Count(slug, "-") < 3 {
+			return false
+		}
+		return true
+	}
+
+	return true
+}
+
