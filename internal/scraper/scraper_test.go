@@ -349,7 +349,7 @@ func TestCollectLevel2(t *testing.T) {
 		if request.URL.Path == "/" {
 			_, _ = w.Write([]byte(`<html><body><a href="/promo-page">Link to Promo</a></body></html>`))
 		} else if request.URL.Path == "/promo-page" {
-			_, _ = w.Write([]byte(`<html><body><p>Oferta relampago com frete gratis</p></body></html>`))
+			_, _ = w.Write([]byte(`<html><body><p>Oferta relampago com frete gratis R$ 99,99</p></body></html>`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -374,8 +374,8 @@ func TestCollectLevel2(t *testing.T) {
 	if len(results[0].Promotions) != 1 {
 		t.Fatalf("len(results[0].Promotions) = %d, want 1, got %d", len(results[0].Promotions), len(results[0].Promotions))
 	}
-	if results[0].Promotions[0].Text != "Oferta relampago com frete gratis" {
-		t.Fatalf("promotion text = %q, want 'Oferta relampago com frete gratis'", results[0].Promotions[0].Text)
+	if results[0].Promotions[0].Text != "Oferta relampago com frete gratis R$ 99,99" {
+		t.Fatalf("promotion text = %q, want 'Oferta relampago com frete gratis R$ 99,99'", results[0].Promotions[0].Text)
 	}
 	// The URL should point to the promo-page
 	if !strings.HasSuffix(results[0].Promotions[0].URL, "/promo-page") {
@@ -424,7 +424,7 @@ func TestCollectDeduplicatesByURL(t *testing.T) {
 				<a href="/produto/item1">Item 1 Second Link</a>
 			</body></html>`))
 		} else if request.URL.Path == "/produto/item1" {
-			_, _ = w.Write([]byte(`<html><body><p>Oferta do item 1 com frete gratis</p></body></html>`))
+			_, _ = w.Write([]byte(`<html><body><p>Oferta do item 1 com frete gratis R$ 99,99</p></body></html>`))
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
