@@ -127,6 +127,7 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 
 	// Extract links from level 1 HTML
 	level2URLs := extractLinks(htmlContent, definition.URL)
+	fmt.Printf("[%s] Extraídos %d links de produtos na página principal\n", definition.Name, len(level2URLs))
 	if len(level2URLs) == 0 {
 		return result
 	}
@@ -134,7 +135,9 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 	// Deduplicate promotions using a map of their URL
 	seen := make(map[string]struct{})
 	for _, p := range promotions {
-		seen[p.URL] = struct{}{}
+		if p.Price > 0 {
+			seen[p.URL] = struct{}{}
+		}
 	}
 
 	// Worker pool to fetch level 2 URLs concurrently
@@ -184,9 +187,18 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 	close(resultsChan)
 
 	// Collect promotions from level 2
+	var numErrors int
+	var lastError error
 	for res := range resultsChan {
+		if res.err != nil {
+			numErrors++
+			lastError = res.err
+		}
 		if res.err == nil && len(res.promos) > 0 {
 			for _, p := range res.promos {
+				if p.Price <= 0 {
+					continue
+				}
 				if _, ok := seen[p.URL]; !ok {
 					seen[p.URL] = struct{}{}
 					result.Promotions = append(result.Promotions, p)
@@ -194,12 +206,15 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 			}
 		}
 	}
+	if numErrors > 0 {
+		fmt.Printf("[%s] Processamento de nível 2 concluído com %d erros. Último erro: %v\n", definition.Name, numErrors, lastError)
+	}
 
 	// Filter promotions to only keep those that are single product pages and deduplicate by URL
 	var filteredPromos []Promotion
 	seenURL := make(map[string]struct{})
 	for _, p := range result.Promotions {
-		if isProductURL(p.URL) {
+		if isProductURL(p.URL) && p.Price > 0 {
 			if _, ok := seenURL[p.URL]; !ok {
 				seenURL[p.URL] = struct{}{}
 				filteredPromos = append(filteredPromos, p)
@@ -213,7 +228,7 @@ func collectSite(ctx context.Context, client *http.Client, definition sites.Defi
 
 // fetchAndExtract realiza a requisição HTTP comum ou utiliza o fallback via navegador (chromedp)
 // para ler o HTML e extrair as promoções de uma URL.
-func fetchAndExtract(ctx context.Context, client *http.Client, definition sites.Definition, targetURL string) (string, []Promotion, int, bool, string, error) {
+func fetchAndExtract(ctx context.Context, client *http.Client, definition sites.Definition, targetURL string) (htmlOut string, promosOut []Promotion, codeOut int, blockedOut bool, reasonOut string, errOut error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
 		return "", nil, 0, false, "", err
@@ -264,11 +279,30 @@ func fetchAndExtract(ctx context.Context, client *http.Client, definition sites.
 		return "", nil, response.StatusCode, false, "", err
 	}
 
-	promos, err := ExtractPromotions(definition, string(body), time.Now().UTC())
-	if err != nil {
-		return string(body), nil, response.StatusCode, false, "", err
+	bodyStr := string(body)
+	blocked, blockReason := detectBlockedResponse(response, bodyStr)
+	if blocked {
+		// Caso a resposta seja identificada como bloqueio/desafio, aciona o fallback via navegador
+		htmlContent, browserErr := fetchWithBrowser(ctx, targetURL)
+		if browserErr == nil {
+			stillBlocked, stillBlockedReason := detectBlockedResponse(nil, htmlContent)
+			if !stillBlocked {
+				promotions, extractErr := ExtractPromotions(definition, htmlContent, time.Now().UTC())
+				if extractErr == nil {
+					return htmlContent, promotions, http.StatusOK, false, "", nil
+				}
+				return htmlContent, nil, http.StatusOK, false, "", extractErr
+			}
+			return htmlContent, nil, response.StatusCode, true, "browser fallback also blocked: " + stillBlockedReason, fmt.Errorf("response blocked by challenge: %s", blockReason)
+		}
+		return bodyStr, nil, response.StatusCode, true, blockReason, fmt.Errorf("response blocked by challenge: %s", blockReason)
 	}
-	return string(body), promos, response.StatusCode, false, "", nil
+
+	promos, err := ExtractPromotions(definition, bodyStr, time.Now().UTC())
+	if err != nil {
+		return bodyStr, nil, response.StatusCode, false, "", err
+	}
+	return bodyStr, promos, response.StatusCode, false, "", nil
 }
 
 func isStaticFile(path string) bool {
