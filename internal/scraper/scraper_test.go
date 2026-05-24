@@ -383,3 +383,107 @@ func TestCollectLevel2(t *testing.T) {
 	}
 }
 
+func TestIsProductURL(t *testing.T) {
+	tests := []struct {
+		urlStr string
+		want   bool
+	}{
+		// Kabum
+		{"https://www.kabum.com.br/produto/12345/mouse-gamer", true},
+		{"https://www.kabum.com.br/hardware/coolers", false},
+		{"https://www.kabum.com.br/promocao/maisvendidos", false},
+		// Terabyte
+		{"https://www.terabyteshop.com.br/produto/54321/teclado-mecanico", true},
+		{"https://www.terabyteshop.com.br/categoria/hardware", false},
+		// Pichau
+		{"https://www.pichau.com.br/suporte-para-monitor-zinnia-tms-90-17-pol-a-32-pol-preto-zno-tms90-bl01", true},
+		{"https://www.pichau.com.br/mesa-gamer-brateck-120cm-preto-brateck-gmd15-19", true},
+		{"https://www.pichau.com.br/monitores", false},
+		{"https://www.pichau.com.br/cadeiras/gamer", false},
+		{"https://www.pichau.com.br/search?q=mouse", false},
+		// Mocks / Others
+		{"https://example.com/some-path", true},
+		{"http://127.0.0.1:8080/test", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.urlStr, func(t *testing.T) {
+			got := isProductURL(tt.urlStr)
+			if got != tt.want {
+				t.Errorf("isProductURL(%q) = %v, want %v", tt.urlStr, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCollectDeduplicatesByURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/" {
+			_, _ = w.Write([]byte(`<html><body>
+				<a href="/produto/item1">Item 1 First Link</a>
+				<a href="/produto/item1">Item 1 Second Link</a>
+			</body></html>`))
+		} else if request.URL.Path == "/produto/item1" {
+			_, _ = w.Write([]byte(`<html><body><p>Oferta do item 1 com frete gratis</p></body></html>`))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	results, err := Collect(context.Background(), server.Client(), []sites.Definition{
+		{
+			Name:    "Store C",
+			URL:     server.URL,
+			Pattern: `(?i)oferta.{0,40}`,
+			Enabled: true,
+		},
+	}, Options{Concurrency: 1})
+
+	if err != nil {
+		t.Fatalf("Collect() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1", len(results))
+	}
+	// Mesmo que o link apareça duas vezes, esperamos exatamente 1 promoção no resultado.
+	if len(results[0].Promotions) != 1 {
+		t.Fatalf("len(results[0].Promotions) = %d, want 1 (deduplicated by URL), got %d", len(results[0].Promotions), len(results[0].Promotions))
+	}
+}
+
+func TestExtractPromotionsWith9PercentDiscount(t *testing.T) {
+	definition := sites.Definition{
+		Name:    "Kabum",
+		URL:     "https://www.kabum.com.br/produto/123/mouse-gamer",
+		Pattern: `(?i)oferta_nao_existente`,
+		Enabled: true,
+	}
+
+	// 1. Desconto maior que 9% (20%): deve capturar
+	htmlOver := `<html><head><title>Mouse Gamer Redragon</title></head><body>De: R$ 100 Por: R$ 80</body></html>`
+	promosOver, err := ExtractPromotions(definition, htmlOver, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promosOver) != 1 {
+		t.Fatalf("expected 1 promotion for >9%% discount, got %d", len(promosOver))
+	}
+	if promosOver[0].Price != 80 || promosOver[0].OriginalPrice != 100 {
+		t.Errorf("wrong prices: got price=%f, orig=%f", promosOver[0].Price, promosOver[0].OriginalPrice)
+	}
+
+	// 2. Desconto de 9% ou menor (5%): não deve capturar
+	htmlUnder := `<html><head><title>Mouse Gamer Redragon</title></head><body>De: R$ 100 Por: R$ 95</body></html>`
+	promosUnder, err := ExtractPromotions(definition, htmlUnder, time.Unix(0, 0).UTC())
+	if err != nil {
+		t.Fatalf("ExtractPromotions() error = %v", err)
+	}
+	if len(promosUnder) != 0 {
+		t.Fatalf("expected 0 promotions for <=9%% discount, got %d", len(promosUnder))
+	}
+}
+
+
+
+
